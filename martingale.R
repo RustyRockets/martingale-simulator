@@ -1,3 +1,10 @@
+# Martingale betting simulator.
+#
+# Classic Martingale: bet a base amount; after every loss double the bet, after
+# every win go back to the base bet. Reverse Martingale does the opposite
+# (double after wins). Each call simulates one gambler from their starting
+# bankroll until they go broke or hit one of the optional stop rules.
+
 # libraries
 library(tidyverse)
 
@@ -7,6 +14,11 @@ library(tidyverse)
 # stop_factor: stop once cash reaches this multiple of the starting bankroll
 # reverse: double after wins instead of losses (reverse Martingale)
 # stop_on_next_win: when stop_condn triggers, keep playing until the next win, then stop
+# plot: build a ggplot of the bankroll over time
+#
+# Returns a list with one entry per spin: bet, cash before the spin, outcome
+# (1 = win, 0 = loss), total_cash after the spin, plus trials (number of spins)
+# and plot (NULL when plot = FALSE).
 martingale <- function(bet, cash, p, stop_condn = Inf, stop_factor = Inf, reverse = FALSE,
                        plot = TRUE, stop_on_next_win = TRUE){
 

@@ -17,13 +17,21 @@ $400 bankroll, and each player plays until the money is gone.
 | | Min | Median | Mean | Max |
 |---|---|---|---|---|
 | Spins until broke | 7 | 128 | 311 | 16,323 |
-| Peak bankroll ($) | 395 | 635 | 994 | 34,915 |
+| Peak bankroll after the first spin ($) | 395 | 635 | 994 | 34,915 |
 
-Every player went broke. The typical player was **up more than $200 at their
-peak**, which is exactly why the system is so convincing at the table, and then a
-losing streak long enough to exceed the bankroll arrived anyway. Doubling bets
-changes the *shape* of the outcomes (many small wins, rare catastrophic losses),
-but it cannot change a negative expected value.
+Since every simulated player keeps going until the money runs out, everyone
+ending at $0 is built into the setup, not a result. What the simulation does show:
+
+- **The system feels like it works.** 98% of players were ahead of their starting
+  $400 at some point, and the median player peaked at $635.
+- **Walking away doesn't rescue it.** If every player had quit the moment they
+  doubled their money, only **34.9%** would have made it. The rest lose the full
+  $400, for an **average result of about −$121 per player**.
+
+That is the house edge showing through. Doubling bets changes the *shape* of the
+outcomes (many small wins, rare catastrophic losses) but cannot change a negative
+expected value. A fair coin would give roughly a 50% chance of doubling; American
+roulette's 18/38 odds pull it well below that.
 
 ## Usage
 
