@@ -1,0 +1,24 @@
+project:
+  type: default
+  output-dir: ../docs
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    code-fold: true
+    code-summary: "Show code"
+    code-tools:
+      source: https://github.com/RustyRockets/martingale-simulator/blob/main/report/index.qmd
+    fig-width: 8
+    fig-height: 4.5
+    fig-dpi: 150
+    embed-resources: false
+    smooth-scroll: true
+
+execute:
+  warning: false
+  message: false

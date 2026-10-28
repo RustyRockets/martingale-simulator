@@ -1,0 +1,447 @@
+---
+title: "Can a betting system beat the house?"
+subtitle: "The Martingale, the mathematics named after it, and what actually works if you must gamble"
+author: "Ranganathan Chandrashekhar"
+date: last-modified
+date-format: "MMMM YYYY"
+bibliography: references.bib
+link-citations: true
+---
+
+```{r setup}
+#| code-summary: "Setup: load the simulator, exact solver and formulas"
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+# Quarto's R process may start without a UTF-8 locale; without one, the minus
+# signs in tables and chart labels print as "<U+2212>".
+invisible(Sys.setlocale("LC_CTYPE", "en_US.UTF-8"))
+
+for (f in list.files("../R", pattern = "\\.R$", full.names = TRUE)) source(f)
+
+# The scenario used throughout: American roulette, always betting red,
+# $5 base bet, $400 bankroll.
+p <- P_AMERICAN
+unit <- 5
+bankroll <- 400
+edge <- 1 - 2 * p  # house edge on an even-money bet, 2/38
+
+# Formatting helpers for numbers quoted in the text
+pct <- function(x, d = 1) sprintf(paste0("%.", d, "f%%"), 100 * x)
+usd <- function(x) scales::dollar(round(x), style_negative = "minus")
+num <- function(x) format(round(x), big.mark = ",")
+
+# Chart styling: recessive grid, one highlight color per strategy of interest
+col_mart <- "#2a78d6"   # Martingale
+col_bold <- "#eb6834"   # bold play
+col_other <- "#8a8f98"  # every other strategy (context, labeled directly)
+theme_set(
+  theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major = element_line(color = "#e3e5e8"),
+          plot.title = element_text(face = "bold"),
+          plot.subtitle = element_text(color = "#5d6066"),
+          plot.title.position = "plot",
+          legend.position = "none")
+)
+strategy_colors <- c("Martingale" = col_mart, "Bold play" = col_bold,
+                     "Flat bets" = col_other, "Reverse Martingale" = col_other,
+                     "D'Alembert" = col_other, "Fibonacci" = col_other)
+
+set.seed(2024)
+```
+
+```{r compute}
+#| code-summary: "Run every calculation the report quotes"
+# 1. Exact answers for each strategy trying to turn $400 into $800
+exact <- compare_exact(all_strategies(), bankroll, p, unit, goal = 2 * bankroll)
+
+# 2. The same question by simulation, 10,000 players per strategy
+n_sim <- 10000
+sims <- lapply(all_strategies(), function(s) {
+  simulate_many(n_sim, s, bankroll, p, unit, goal = 2 * bankroll)
+})
+sim_summary <- data.frame(
+  strategy = sapply(all_strategies(), `[[`, "name"),
+  sim_p_goal = sapply(sims, function(d) mean(d$reached_goal)),
+  sim_result = sapply(sims, function(d) mean(d$result))
+)
+both <- merge(exact, sim_summary, by = "strategy")
+
+# 3. The original experiment: Martingale players who never walk away
+broke <- simulate_many(n_sim, martingale(), bankroll, p, unit, goal = Inf)
+share_ahead <- mean(broke$peak > bankroll)
+
+m <- exact[exact$strategy == "Martingale", ]
+b <- exact[exact$strategy == "Bold play", ]
+f <- exact[exact$strategy == "Flat bets", ]
+```
+
+::: findings
+**What this project finds** (American roulette, betting red, $400 bankroll, trying to reach $800)
+
+1. **Every system loses the same share of what it bets.** Your average loss is
+   the house edge (`r pct(edge, 2)`) times the total amount you bet. This holds exactly
+   for all six strategies tested. The Martingale doesn't beat the edge. It makes
+   you bet `r round(m$exp_wagered / bankroll, 1)` times your bankroll.
+2. **A single bold bet beats the Martingale.** One $400 bet on red doubles your money
+   `r pct(b$p_goal)` of the time and costs `r usd(b$exp_result)` on average. The
+   Martingale manages `r pct(m$p_goal)` and costs `r usd(m$exp_result)`.
+3. **A high win rate is the wrong thing to measure.** Aim for a small profit and the
+   Martingale wins most sessions, yet it still loses money on average. That pattern
+   (frequent small gains, rare ruinous losses) shows up well beyond the casino.
+:::
+
+## The promise
+
+In the carnival of 1754, Giacomo Casanova was gambling in Venice with money
+belonging to his lover. His memoirs record that, "playing the martingale, and
+doubling my stakes continuously, I won every day during the remainder of the
+carnival." Not long after, the story ends the way it usually does: "I still
+played on the martingale, but with such bad luck that I was soon left without a
+sequin." [@casanova]
+
+The system is simple. Bet one unit on red. If you lose, double the bet. When you
+finally win, that one win recovers every loss in the streak plus one unit of profit,
+and you start again. Since red has to come up eventually, it *feels* like a machine
+for printing small, steady wins.
+
+```{r single-run}
+#| fig-cap: "One simulated Martingale player who never walks away."
+set.seed(11)
+run <- simulate_player(martingale(), bankroll, p, unit, path = TRUE)
+run_df <- data.frame(spin = seq_along(run$cash), cash = run$cash)
+
+ggplot(run_df, aes(spin, cash)) +
+  geom_hline(yintercept = bankroll, color = "#5d6066", linetype = "dashed", linewidth = 0.4) +
+  geom_line(color = col_mart, linewidth = 0.7) +
+  annotate("text", x = 60, y = bankroll, label = "Starting bankroll",
+           hjust = 0, vjust = 1.6, color = "#5d6066", size = 3.5) +
+  scale_y_continuous(labels = scales::dollar, limits = c(0, NA)) +
+  labs(x = "Spin", y = "Cash in hand",
+       title = "The bankroll creeps up, then a losing streak wipes it out",
+       subtitle = "$5 base bet, $400 bankroll, betting red on American roulette")
+```
+
+That is what most players see. Among `r num(n_sim)` simulated players who use the
+Martingale and never walk away, **`r pct(share_ahead)` were ahead of their starting
+$400 at some point**. The median player's best moment was `r usd(median(broke$peak))`.
+In the end every one of them lost the whole bankroll, but that isn't a finding: a
+player who never stops in a game with a house edge will always go broke eventually.
+The useful question is what happens to players who *do* plan to stop.
+
+## Why no system can win
+
+Here is the rule that settles it. On every spin, a bet on red loses `r pct(edge, 2)`
+of its stake on average. A betting system decides *how much* to stake and *when to
+stop*, but it can't change the edge on any single spin. So over a whole session:
+
+$$
+\text{average result} = -\text{house edge} \times \text{average total amount bet}
+$$
+
+This is Wald's identity applied to gambling, and Ethier [-@ethier, p. 298] proves it
+holds for every betting system. As Epstein puts it, all betting systems
+"lead ultimately to the same mathematical expectation of gain per unit amount
+wagered" [@epstein, p. 52].
+
+The project doesn't take this on trust. Its exact solver calculates each strategy's
+average result from the distribution of final bankrolls, without using the house
+edge, and the identity comes out to within rounding error for every strategy
+(it is also one of the automated tests):
+
+```{r identity}
+#| fig-cap: "Exact results for six strategies, each trying to turn $400 into $800."
+#| fig-height: 4.8
+# Labels are placed by hand, clear of the dashed line: offsets in dollars
+# from each point, and which side of the label anchors to that position.
+label_pos <- data.frame(
+  strategy = c("Bold play", "Martingale", "Reverse Martingale", "Fibonacci", "D'Alembert", "Flat bets"),
+  dx = c(150, 150, -150, 150, -150, -200),
+  dy = c(8, 25, -25, 25, -25, 0),
+  hjust = c(0, 0, 1, 0, 1, 1)
+)
+exact_plot <- merge(exact, label_pos, by = "strategy")
+
+ggplot(exact_plot, aes(exp_wagered, exp_result)) +
+  geom_abline(slope = -edge, intercept = 0, color = "#5d6066", linewidth = 0.4,
+              linetype = "dashed") +
+  geom_point(aes(color = strategy), size = 3.2) +
+  geom_text(aes(x = exp_wagered + dx, y = exp_result + dy, label = strategy, hjust = hjust),
+            size = 3.6, color = "#1c1d1f") +
+  annotate("text", x = 3900, y = -60, label = "Dashed line: average result = −5.26% × amount bet",
+           hjust = 0, color = "#5d6066", size = 3.3) +
+  scale_color_manual(values = strategy_colors) +
+  scale_x_continuous(labels = scales::dollar, limits = c(0, NA)) +
+  scale_y_continuous(labels = function(x) scales::dollar(x, style_negative = "minus")) +
+  labs(x = "Average total amount bet in the session",
+       y = "Average result",
+       title = "Every strategy sits on the same line",
+       subtitle = "The more you bet in total, the more you lose. Nothing else matters to the average.")
+```
+
+```{r identity-table}
+exact |>
+  arrange(desc(p_goal)) |>
+  transmute(Strategy = strategy,
+            `Average total bet` = usd(exp_wagered),
+            `Average result` = usd(exp_result),
+            `Result ÷ amount bet` = pct(exp_result / exp_wagered, 2),
+            `Average spins` = num(exp_spins)) |>
+  knitr::kable(align = "lrrrr")
+```
+
+The word *martingale* has a second life here. In 1939 the French mathematician
+Jean Ville borrowed the gamblers' term for a new idea in probability theory: a fair
+game in which, whatever you know so far, your expected future fortune equals your
+present one [@mansuy]. Joseph Doob developed the idea into one of the central tools of
+modern probability. A central result, the *optional stopping theorem*, says that
+with finite money and finite time, no rule for sizing bets or choosing when to stop can turn a
+fair game into a favourable one, let alone an unfavourable game like roulette. The
+system gave the mathematics its name, and the mathematics shows why the system can't work.
+
+## Why it feels like it works anyway
+
+The Martingale isn't fooling people with nothing. It really does win small amounts most
+of the time. It fails only when a losing streak runs longer than the bankroll can cover,
+and that streak is rare on any given spin.
+
+With a $5 base bet, a $400 bankroll covers
+`r max_covered_streak(bankroll, unit)` losses in a row
+($5 + $10 + … + $160 = $315). The seventh bet would be $320 with only $85 left.
+Seven reds missed in a row has probability
+`r pct((1 - p)^7, 2)`, so it almost never happens on a given spin. Over a long
+evening it becomes likely:
+
+```{r streak}
+#| fig-cap: "Exact probability, from the run-length formula in R/formulas.R."
+spins <- 1:1000
+streak_df <- data.frame(spins = spins,
+                        prob = sapply(spins, function(n) prob_losing_streak(7, n, 1 - p)))
+p500 <- streak_df$prob[500]
+
+ggplot(streak_df, aes(spins, prob)) +
+  geom_line(color = col_mart, linewidth = 0.8) +
+  annotate("point", x = 500, y = p500, color = col_mart, size = 2.8) +
+  annotate("text", x = 500, y = p500, label = paste0(pct(p500, 0), " by spin 500"),
+           hjust = -0.15, vjust = 1.4, size = 3.6) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(x = "Spins played", y = "Chance of at least one 7-loss streak",
+       title = "Rare on any spin, likely over an evening",
+       subtitle = "Probability of seeing 7 or more losses in a row on red, American roulette")
+```
+
+Can a bigger bankroll fix this? Each extra loss you want to cover **doubles** the money
+you need, but only cuts the chance of the fatal streak by a factor of
+`r round(1 - p, 3)`. Meanwhile the average loss stays the same share of everything you
+bet. Casinos also set table maximums, which stop the doubling at a fixed point no matter
+how rich the player is [@pflaumer]. The simulator models this: when the next doubled bet
+would exceed the limit, the player takes the loss and starts again at the base bet.
+
+```{r bankroll-table}
+streaks <- 4:12
+tibble(`Losses covered` = streaks,
+       `Bankroll needed` = usd(unit * (2^streaks - 1)),
+       `Chance the fatal streak appears within 500 spins` =
+         pct(sapply(streaks + 1, function(k) prob_losing_streak(k, 500, 1 - p)))) |>
+  knitr::kable(align = "rrr")
+```
+
+## If you must gamble
+
+Suppose the goal is modest and concrete: turn $400 into $800, then go home. Which
+strategy gives the best chance?
+
+```{r compare}
+#| fig-cap: "Exact probabilities. Points show 10,000 simulated players per strategy."
+#| fig-height: 4
+cmp <- both |> arrange(p_goal) |> mutate(strategy = factor(strategy, levels = strategy))
+
+ggplot(cmp, aes(p_goal, strategy)) +
+  geom_segment(aes(x = 0, xend = p_goal, yend = strategy, color = strategy),
+               linewidth = 2.2, lineend = "round") +
+  geom_point(aes(x = sim_p_goal), shape = 21, fill = "white", color = "#1c1d1f", size = 2.2) +
+  geom_text(aes(label = ifelse(p_goal < 0.01, pct(p_goal, 2), pct(p_goal))),
+            hjust = -0.25, size = 3.6) +
+  scale_color_manual(values = strategy_colors) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.56), expand = c(0, 0)) +
+  labs(x = "Chance of doubling $400 before going broke", y = NULL,
+       title = "One big bet beats every progression",
+       subtitle = "Bars: exact solver. White dots: simulation. They agree to within sampling error.") +
+  theme(panel.grid.major.y = element_blank())
+```
+
+```{r compare-table}
+both |>
+  arrange(desc(p_goal)) |>
+  transmute(Strategy = strategy,
+            `Chance of doubling (exact)` = pct(p_goal, 2),
+            `Simulated (10,000 players)` = pct(sim_p_goal, 2),
+            `Average result (exact)` = usd(exp_result),
+            `Simulated average` = usd(sim_result)) |>
+  knitr::kable(align = "lrrrr")
+```
+
+The winner is **bold play**: bet whatever gets you to the goal in one win, or everything
+you have if that's less. Here that means a single $400 bet on red. It succeeds with
+probability exactly 18/38 = `r pct(b$p_goal)` and costs `r usd(b$exp_result)` on average,
+because you only expose $400 to the house edge once.
+
+This isn't a quirk of the scenario. Dubins and Savage proved in *How to Gamble If You
+Must* that in a game where the odds are against you, bold play maximises the chance of
+reaching a fixed goal [@dubins-savage]. The identity above shows why. When a session
+can only end broke or exactly at the goal (true for flat bets, the Martingale and bold
+play), the average final bankroll is simply the goal times the chance of reaching it.
+Combining that with the identity gives:
+
+$$
+P(\text{reach goal}) = \frac{\text{bankroll} - \text{house edge} \times \text{average total amount bet}}{\text{goal}}
+$$
+
+For the Martingale: ($400 − 5.26% × `r usd(m$exp_wagered)`) ÷ $800 =
+`r pct(m$p_goal)`. Every extra dollar a strategy bets on the way to the goal costs it
+a fixed slice of its chance of getting there, so the strategy that bets least wins most
+often. Flat $5 bets are the opposite
+extreme. They need about `r num(f$exp_spins)` spins on average, and the edge grinds the
+chance of doubling down to `r pct(f$p_goal, 2)`.
+
+From this angle the Martingale is a timid version of bold play. Each round risks a
+growing amount in the hope of winning one unit back, so it bets much more in total
+than one bold bet would, without improving the odds. The reverse Martingale reaches the
+goal less often, but it loses less on average than the Martingale because it bets
+less overall.
+
+None of this makes roulette a good investment. Every strategy in the table has a negative
+average. Bold play is simply the least bad way to chase a fixed target.
+
+## A high win rate is the wrong metric
+
+The Martingale's real appeal is its win rate. Aim for a small enough profit and it
+"works" most of the time:
+
+```{r win-rate}
+#| fig-cap: "Exact results for a $400 bankroll aiming for a profit of $25 to $400."
+#| fig-height: 4.4
+targets <- seq(25, 400, by = 25)
+wr <- do.call(rbind, lapply(targets, function(t) {
+  rbind(
+    cbind(target = t, strategy = "Martingale",
+          as.data.frame(solve_exact(martingale(), bankroll, p, unit, bankroll + t)[c("p_goal", "exp_result")])),
+    cbind(target = t, strategy = "Bold play",
+          as.data.frame(solve_exact(bold_play(), bankroll, p, unit, bankroll + t)[c("p_goal", "exp_result")]))
+  )
+}))
+m25 <- wr[wr$target == 25 & wr$strategy == "Martingale", ]
+
+# Label each line at its right end: bold play above its line, Martingale below.
+end_labels <- wr |> filter(target == max(targets)) |>
+  mutate(vjust = ifelse(strategy == "Bold play", -0.8, 1.8))
+g1 <- ggplot(wr, aes(target, p_goal, color = strategy)) +
+  geom_line(linewidth = 0.8) +
+  geom_text(data = end_labels, aes(label = strategy, vjust = vjust), hjust = 1, size = 3.4) +
+  scale_color_manual(values = strategy_colors) +
+  scale_x_continuous(labels = scales::dollar) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(x = "Profit target", y = NULL, title = "Chance of hitting the target")
+g2 <- ggplot(wr, aes(target, exp_result, color = strategy)) +
+  geom_hline(yintercept = 0, color = "#5d6066", linewidth = 0.4) +
+  geom_line(linewidth = 0.8) +
+  geom_text(data = end_labels, aes(label = strategy, vjust = vjust), hjust = 1, size = 3.4) +
+  scale_color_manual(values = strategy_colors) +
+  scale_x_continuous(labels = scales::dollar) +
+  scale_y_continuous(labels = function(x) scales::dollar(x, style_negative = "minus")) +
+  labs(x = "Profit target", y = NULL, title = "Average result")
+g1 + g2 + plot_annotation(
+  title = "Win often, still lose on average",
+  subtitle = "Martingale vs bold play, $400 bankroll, American roulette",
+  theme = theme(plot.title = element_text(face = "bold"),
+                plot.subtitle = element_text(color = "#5d6066"))
+)
+```
+
+A Martingale player aiming to win $25 succeeds **`r pct(m25$p_goal)`** of the time.
+The other `r pct(1 - m25$p_goal)` of sessions lose close to the whole $400, so the
+average result is still `r usd(m25$exp_result)`. Someone who judged the strategy by
+its win rate, or by a short run of sessions, would think it was excellent.
+
+That payoff shape (usually win a little, occasionally lose almost everything) is not
+unique to roulette. The examples below are **analogies, not claims that markets are
+roulette wheels**. What they share is the shape of the payoff, not the odds.
+
+- **Doubling down at Barings.** Brown and Steenbeek studied exchange data from Nick
+  Leeson's trading in Singapore and found that he "continuously doubled his position
+  as prices were falling". The losses, around US$1.4 billion, brought down Barings
+  Bank in 1995 [@brown-steenbeek]. Their warning applies to any doubler: the eventual
+  loss "is preceded by a period of high returns with low volatility", which looks
+  like skill until it isn't.
+- **Betting on calm markets.** Short-volatility exchange-traded products profit
+  steadily while stock markets stay calm. On 5 February 2018 a jump in volatility
+  caused a one-day loss of more than 90% in their value [@augustin-volmageddon].
+- **"Martingale" trading bots.** Automated strategies that add to a losing position at
+  set intervals are commissioned for retail forex platforms such as MetaTrader under
+  that name [@mql5-grid]. They follow the same logic as the roulette system, and they
+  carry the same risk.
+
+The lesson for anyone evaluating a strategy, model or product metric: **a success rate
+says nothing about the size of the failures.** Look at the expected value and the tail of
+the distribution, and be wary of any evaluation window that may simply not have been long
+enough to catch the rare bad outcome. The first version of this project made a related
+mistake. It reported that every simulated player went broke as if that were a finding,
+when the setup guaranteed it.
+
+## Try it yourself
+
+The explorer below runs the same R code in your browser (via
+[webR](https://docs.r-wasm.org/webr/latest/) and
+[Shinylive](https://posit-dev.github.io/r-shinylive/)). Pick a strategy, bankroll, target
+and table limit to see the exact odds alongside simulated sessions. The first load
+downloads R itself, so give it a few seconds.
+
+::: column-page
+<iframe class="explorer-frame" src="explorer/index.html" title="Betting strategy explorer" loading="lazy"></iframe>
+:::
+
+[Open the explorer in its own tab](explorer/index.html)
+
+## How the numbers were produced
+
+Every result comes from two independent engines that share the same strategy
+definitions (`R/strategies.R`):
+
+- **Simulation** (`R/simulate.R`): plays each session spin by spin with random outcomes.
+- **Exact solver** (`R/exact.R`): with a fixed goal, a session is a Markov chain whose state
+  is (cash in hand, the strategy's memory, such as the current bet). The solver lists
+  every reachable state and solves the chain's linear equations for the probability of
+  reaching the goal, the expected amount bet, the expected number of spins and the
+  expected final bankroll. No random numbers are involved.
+
+The test suite (`tests/testthat/`) checks the two engines against each other and against
+published results:
+
+| Check | Compared against |
+|---|---|
+| Flat betting | The classical gambler's-ruin formula |
+| Bold play | The Dubins–Savage recursion |
+| Every strategy, two wheels, with and without table limits | Average result = −edge × amount bet |
+| Every strategy in a fair game | Average result of exactly zero |
+| Martingale round statistics with a table limit | Pflaumer (2019), Table 1 |
+| Losing-streak probabilities | Brute-force enumeration of all 1,024 ten-spin sequences |
+| Simulation vs exact solver, all six strategies | Agreement within four standard errors |
+
+## Assumptions and limits
+
+- The wheel is fair and spins are independent. Every bet is on an even-money chance
+  (red/black), with no *la partage* or *en prison* rules. Those rules halve the house
+  edge on European wheels and would shrink every loss in this report, but they don't
+  change the conclusions.
+- Bets come in whole $5 units and must be at least the base bet, except that a player
+  who can't cover the next bet stakes everything they have left.
+- The headline scenario ($400 bankroll, $800 goal) is one choice among many. The ordering
+  of strategies is not specific to it: bold play's advantage is a theorem. The exact
+  percentages are specific to it, and the explorer lets you change them.
+- The finance examples illustrate a payoff shape. They are not a model of any market.
+
+## References
+
+::: {#refs}
+:::

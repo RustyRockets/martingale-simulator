@@ -1,0 +1,33 @@
+/* Typography and colors aligned with rustyrockets.github.io */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #1c1d1f;
+  line-height: 1.65;
+}
+h1, h2, h3, .title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+}
+a { color: #1f6f66; }
+.subtitle { color: #5d6066; }
+
+/* Headline findings box */
+.findings {
+  background: #f6f7f8;
+  border-left: 4px solid #1f6f66;
+  padding: 0.75rem 1.25rem;
+  margin: 1.5rem 0;
+}
+.findings ol { margin-bottom: 0; }
+
+/* Explorer embed */
+.explorer-frame {
+  width: 100%;
+  height: 820px;
+  border: 1px solid #e3e5e8;
+  border-radius: 6px;
+}
+
+blockquote { color: #5d6066; border-left-color: #e3e5e8; }

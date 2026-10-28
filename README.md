@@ -1,69 +1,75 @@
 # Can a betting system beat the house?
 
-A small R simulator for the **Martingale** betting system: start with a fixed bet,
-double it after every loss, and go back to the base bet after a win. The first win
-after a losing streak recovers everything lost plus one base bet, so it *feels*
-like a sure thing. This project shows what actually happens to the bankroll.
+An analysis of the **Martingale** betting system (double your bet after every loss)
+and five other roulette strategies. It uses two independent engines written in R, a
+Monte Carlo simulator and an exact Markov-chain solver, which are tested against each
+other and against published results.
 
-![One Martingale run: the bankroll creeps up, survives a couple of losing streaks, then collapses](images/single_run.png)
+**[Read the analysis](https://rustyrockets.github.io/martingale-simulator/)** ·
+**[Try the explorer](https://rustyrockets.github.io/martingale-simulator/explorer/)**
+(runs R in the browser)
 
-## What 10,000 players look like
+![Chance of doubling $400 before going broke, by strategy](images/strategy_comparison.png)
 
-Setup: American roulette betting on red (win probability 18/38), a $5 base bet, a
-$400 bankroll, and each player plays until the money is gone.
+## Findings
 
-![Histogram of spins until bust across 10,000 simulated players](images/spins_to_bust.png)
+Scenario: American roulette, betting red, $5 base bet, $400 bankroll, trying to reach $800.
 
-| | Min | Median | Mean | Max |
-|---|---|---|---|---|
-| Spins until broke | 7 | 128 | 311 | 16,323 |
-| Peak bankroll after the first spin ($) | 395 | 635 | 994 | 34,915 |
-
-Since every simulated player keeps going until the money runs out, everyone
-ending at $0 is built into the setup, not a result. What the simulation does show:
-
-- **The system feels like it works.** 98% of players were ahead of their starting
-  $400 at some point, and the median player peaked at $635.
-- **Walking away doesn't rescue it.** If every player had quit the moment they
-  doubled their money, only **34.9%** would have made it. The rest lose the full
-  $400, for an **average result of about −$121 per player**.
-
-That is the house edge showing through. Doubling bets changes the *shape* of the
-outcomes (many small wins, rare catastrophic losses) but cannot change a negative
-expected value. A fair coin would give roughly a 50% chance of doubling; American
-roulette's 18/38 odds pull it well below that.
+- **Every strategy loses the same share of what it bets.** The average result is
+  −5.26% (the house edge) × the total amount bet, exactly, for all six strategies.
+  The Martingale makes you bet about 5.6× your bankroll.
+- **One bold bet beats the Martingale.** A single $400 bet on red doubles your money
+  47.4% of the time, against 35.4% for the Martingale, and loses less on average
+  (−$21 vs −$117). Dubins and Savage (1965) proved that bold play is optimal for
+  reaching a goal in an unfavourable game.
+- **A high win rate is misleading.** Aiming for a $25 profit, the Martingale succeeds
+  91% of the time and still averages a loss. The same payoff shape appears in doubling
+  strategies outside the casino.
 
 ## Usage
 
 ```r
-source("martingale.R")
+for (f in list.files("R", full.names = TRUE)) source(f)
 
-# one run: $5 base bet, $400 bankroll, betting red on American roulette
-run <- martingale(bet = 5, cash = 400, p = 18/38)
-run$plot
+# Exact answer: chance a Martingale player turns $400 into $800
+solve_exact(martingale(), bankroll = 400, p = P_AMERICAN, unit = 5, goal = 800)
 
-# reverse Martingale (double after wins), walking away at 2x the bankroll
-martingale(5, 400, 18/38, reverse = TRUE, stop_factor = 2)
+# The same question by simulation
+sims <- simulate_many(10000, martingale(), 400, P_AMERICAN, 5, goal = 800)
+mean(sims$reached_goal)
+
+# Compare every strategy at once
+compare_exact(all_strategies(), 400, P_AMERICAN, 5, goal = 800)
 ```
 
-`run_simulation.R` reproduces the charts and table above (seeded, about 15 seconds).
+Strategies: `flat()`, `martingale()`, `reverse_martingale()`, `dalembert()`,
+`fibonacci()`, `bold_play()`. Each simulator and solver call also takes a
+`table_max` (table limit).
 
-| Argument | Meaning |
+Build everything (tests, report, explorer) into `docs/`:
+
+```bash
+Rscript build_site.R
+```
+
+Requires R ≥ 4.3, [Quarto](https://quarto.org), and the packages ggplot2, dplyr,
+patchwork, ggrepel, scales, knitr, rmarkdown, testthat, Matrix, shiny, bslib and
+shinylive. Run the tests alone with `Rscript -e 'testthat::test_dir("tests/testthat")'`.
+
+## Structure
+
+| Path | Purpose |
 |---|---|
-| `bet`, `cash` | Base bet and starting bankroll |
-| `p` | Probability of winning a single bet |
-| `reverse` | Double after wins instead of losses |
-| `stop_factor` | Walk away once the bankroll reaches this multiple of the start |
-| `stop_condn` | Stop once a bet would exceed this share of the cash in hand |
-| `stop_on_next_win` | When `stop_condn` triggers, keep going until the next win, then stop |
-| `plot` | Build a ggplot of the bankroll over time (returned as `$plot`) |
+| `R/strategies.R` | Betting strategies as small state machines, shared by both engines |
+| `R/simulate.R` | Monte Carlo engine: plays sessions spin by spin |
+| `R/exact.R` | Exact engine: solves each session as a Markov chain |
+| `R/formulas.R` | Closed-form results from the literature, used to check the engines |
+| `tests/testthat/` | Engine vs engine vs published formulas |
+| `report/` | Quarto source for the write-up |
+| `explorer/app.R` | Shiny app, exported with Shinylive to run in the browser |
+| `build_site.R` | Runs the tests and builds the site |
+| `.github/workflows/deploy.yml` | Builds and publishes to GitHub Pages on push to `main` |
 
-Requires R and the tidyverse.
+## License
 
-## Changes from the original script
-
-The core logic is unchanged from my original script. While publishing it I fixed:
-- A first-spin check that errors on R 4.3+ (`||` with a zero-length value).
-- `stop_on_next_win` now actually stops at the next win.
-- The function no longer fails when `plot = FALSE`.
-- The 10,000-run loop no longer draws a plot per run; charts are saved to `images/`.
+[MIT](LICENSE)
