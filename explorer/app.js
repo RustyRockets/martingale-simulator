@@ -18,6 +18,13 @@
   let current = null; // results of the latest update, for redraws and hover
 
   const percent = (x, digits = 1) => `${(100 * x).toFixed(digits)}%`;
+  // A probability for display: an extra digit near 0% and 100%, so a small chance
+  // doesn't round to a flat 0.0% or a near-certainty to 100.0%
+  const chance = (x) => {
+    if (x > 0 && x < 0.0001) return "<0.01%";
+    if (x < 1 && x > 0.9999) return ">99.99%";
+    return percent(x, x < 0.01 || x > 0.99 ? 2 : 1);
+  };
   const whole = (x) => Math.round(x).toLocaleString("en-US");
   const dollars = (x) => `${x < 0 ? "−" : ""}$${whole(Math.abs(x))}`;
 
@@ -74,7 +81,7 @@
     const sim = Engine.simulateMany(s.players, s.strategy, s.bankroll, s.p, s.unit, s.goal, s.tableMax);
     current = { s, exact, density, sim, maxSpin };
 
-    $("pGoal").textContent = percent(exact.pGoal);
+    $("pGoal").textContent = chance(exact.pGoal);
     $("expResult").textContent = dollars(exact.expResult);
     $("expWagered").textContent = dollars(exact.expWagered);
     $("expSpins").textContent = whole(exact.expSpins);
@@ -87,7 +94,7 @@
     const { exact } = current;
     const items = [["Reached target", COLORS.won, exact.pGoal], ["Went broke", COLORS.broke, 1 - exact.pGoal]];
     $("legend").innerHTML =
-      items.map(([label, color, share]) => `<span><i style="background:${color}"></i>${label} ${percent(share)}</span>`).join("") +
+      items.map(([label, color, share]) => `<span><i style="background:${color}"></i>${label} ${chance(share)}</span>`).join("") +
       `<span><i style="background:${COLORS.playing}"></i>Still playing</span>`;
   }
 
@@ -101,7 +108,7 @@
     const mean = results.reduce((a, b) => a + b, 0) / n;
     const sd = Math.sqrt(results.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
     $("heatNote").textContent = `Darker means more players held that amount. The black line is a typical session. Showing the first ${whole(maxSpin)} spins, when 95% of sessions had ended.`;
-    $("simNote").textContent = `Check: ${whole(n)} simulated players reached the target ${percent(share)} of the time (±${(196 * Math.sqrt((share * (1 - share)) / n)).toFixed(1)}), averaging ${dollars(mean)} (±$${whole((1.96 * sd) / Math.sqrt(n))}). Exact: ${percent(exact.pGoal)}, ${dollars(exact.expResult)}.`;
+    $("simNote").textContent = `Check: ${whole(n)} simulated players reached the target ${percent(share)} of the time (±${(196 * Math.sqrt((share * (1 - share)) / n)).toFixed(1)}), averaging ${dollars(mean)} (±$${whole((1.96 * sd) / Math.sqrt(n))}). Exact: ${chance(exact.pGoal)}, ${dollars(exact.expResult)}.`;
   }
 
   function plotArea(el) {
@@ -228,7 +235,7 @@
       ${axes(a, maxSpin, 1, (v) => `${Math.round(100 * v)}%`)}
       <line id="crosshair" y1="${a.y0}" y2="${a.y0 + a.h}" stroke="${INK}" visibility="hidden"/>
     </svg>`;
-    el.setAttribute("aria-label", `Stacked area chart of players over time. ${percent(exact.pGoal)} reach the target and the rest go broke.`);
+    el.setAttribute("aria-label", `Stacked area chart of players over time. ${chance(exact.pGoal)} reach the target and the rest go broke.`);
     current.statusArea = a;
   }
 
