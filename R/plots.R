@@ -1,6 +1,5 @@
-# Charts shared by the report and the explorer, so both draw simulated sessions
-# the same way. These functions need ggplot2 attached by the caller; nothing
-# else in R/ depends on it.
+# Simulation charts for the report. These functions need ggplot2 attached by the
+# caller; nothing else in R/ depends on it.
 
 CHART_INK <- "#1c1d1f"
 CHART_MUTED <- "#5d6066"
@@ -117,13 +116,11 @@ plot_session_density <- function(density, bankroll, goal = NULL, typical = NULL,
     ggplot2::theme(panel.grid = ggplot2::element_blank())
 }
 
-# Stacked area of every player's state over time. Short labels keep the legend
-# inside narrow cards.
-plot_status <- function(status, base_size = 14, short_labels = FALSE) {
-  labels <- if (short_labels) c("Reached", "Playing", "Broke") else names(STATUS_COLORS)
+# Stacked area of every player's state over time
+plot_status <- function(status, base_size = 14) {
   ggplot2::ggplot(status, ggplot2::aes(spin, share, fill = status)) +
     ggplot2::geom_area(color = "white", linewidth = 0.4) +
-    ggplot2::scale_fill_manual(values = STATUS_COLORS, labels = labels, name = NULL) +
+    ggplot2::scale_fill_manual(values = STATUS_COLORS, name = NULL) +
     ggplot2::scale_y_continuous(labels = scales::percent) +
     ggplot2::coord_cartesian(expand = FALSE) +
     ggplot2::labs(x = "Spin", y = NULL) +

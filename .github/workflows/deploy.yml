@@ -1,4 +1,4 @@
-# Runs the tests, builds the report and the in-browser explorer, and publishes
+# Runs the tests, builds the report and the explorer, and publishes
 # them to GitHub Pages. Pull requests get the tests and build only; pushes to
 # main also deploy. Can be run by hand from the repo's Actions tab.
 name: Build and deploy
@@ -33,9 +33,13 @@ jobs:
 
       - name: Install R packages
         run: |
-          Rscript -e 'install.packages(c("ggplot2", "dplyr", "patchwork", "munsell", "tibble", "withr", "MASS", "mgcv",
-            "scales", "knitr", "rmarkdown", "testthat", "Matrix", "shiny", "bslib",
-            "shinylive"))'
+          Rscript -e 'install.packages(c("ggplot2", "dplyr", "patchwork", "scales",
+            "knitr", "rmarkdown", "testthat", "Matrix"))'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2

@@ -109,7 +109,7 @@ bold_play <- function() {
   )
 }
 
-# Every strategy, keyed by a short id. Used by the report and the explorer.
+# Every strategy, keyed by a short id. explorer/engine.js uses the same ids.
 all_strategies <- function() {
   list(
     flat = flat(),

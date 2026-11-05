@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Betting strategy explorer</title>
+  <meta name="description" content="Compare roulette betting strategies with exact odds and simulated players.">
+  <link rel="stylesheet" href="explorer.css">
+</head>
+<body>
+  <main class="explorer">
+    <form id="controls" class="controls" aria-label="Settings">
+      <h1>Betting strategy explorer</h1>
+
+      <label>Strategy
+        <select id="strategy"></select>
+      </label>
+
+      <fieldset>
+        <legend>Wheel</legend>
+        <label class="inline"><input type="radio" name="wheel" value="american" checked> American (0, 00)</label>
+        <label class="inline"><input type="radio" name="wheel" value="european"> European (0)</label>
+      </fieldset>
+
+      <label>Starting bankroll ($)
+        <input id="bankroll" type="number" min="1" step="50" value="400" inputmode="numeric">
+      </label>
+
+      <label>Base bet ($)
+        <select id="unit">
+          <option>1</option><option selected>5</option><option>10</option><option>25</option>
+        </select>
+      </label>
+
+      <label>Walk away after winning ($)
+        <input id="target" type="number" min="1" step="25" value="400" inputmode="numeric">
+      </label>
+
+      <label>Table maximum
+        <select id="tableMax">
+          <option value="Infinity">No limit</option>
+          <option value="100">$100</option>
+          <option value="500">$500</option>
+          <option value="1000">$1,000</option>
+          <option value="5000">$5,000</option>
+        </select>
+      </label>
+      <p class="hint">A limit only changes the result if the strategy would bet more than it.</p>
+
+      <label>Simulated players
+        <select id="players">
+          <option>500</option><option selected>2000</option><option>10000</option>
+        </select>
+      </label>
+    </form>
+
+    <section class="results" aria-live="polite">
+      <p id="problem" class="problem" hidden></p>
+
+      <div class="tiles">
+        <div class="tile lead"><span>Chance of reaching target</span><strong id="pGoal"></strong></div>
+        <div class="tile"><span>Average result</span><strong id="expResult"></strong></div>
+        <div class="tile"><span>Average total bet</span><strong id="expWagered"></strong></div>
+        <div class="tile"><span>Average spins</span><strong id="expSpins"></strong></div>
+      </div>
+
+      <div class="charts">
+        <figure class="card">
+          <figcaption>Where the money is</figcaption>
+          <div id="heat" class="chart" role="img"></div>
+          <p id="heatNote" class="note"></p>
+        </figure>
+        <figure class="card">
+          <figcaption>Where every player stands</figcaption>
+          <div id="legend" class="legend"></div>
+          <div id="status" class="chart" role="img"></div>
+          <p id="simNote" class="note"></p>
+        </figure>
+      </div>
+    </section>
+  </main>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

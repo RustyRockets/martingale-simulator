@@ -10,7 +10,7 @@ published results.
 
 **[Read the analysis](https://rustyrockets.github.io/martingale-simulator/)** ·
 **[Try the explorer](https://rustyrockets.github.io/martingale-simulator/explorer/)**
-(runs R in the browser)
+(updates as you type)
 
 ![Chance of doubling $400 before going broke, by strategy](images/strategy_comparison.png)
 
@@ -57,9 +57,9 @@ Build everything (tests, report, explorer) into `docs/`:
 Rscript build_site.R
 ```
 
-Built with R 4.4 and [Quarto](https://quarto.org), and the packages ggplot2, dplyr,
-patchwork, munsell, tibble, withr, MASS, mgcv, scales, knitr, rmarkdown, testthat, Matrix, shiny, bslib and
-shinylive. Run the tests alone with `Rscript -e 'testthat::test_dir("tests/testthat")'`.
+Built with R 4.4, [Quarto](https://quarto.org) and Node.js, and the R packages ggplot2,
+dplyr, patchwork, scales, knitr, rmarkdown, testthat and Matrix. Run the R tests alone with
+`Rscript -e 'testthat::test_dir("tests/testthat")'`.
 
 ## Structure
 
@@ -69,10 +69,11 @@ shinylive. Run the tests alone with `Rscript -e 'testthat::test_dir("tests/testt
 | `R/simulate.R` | Monte Carlo engine: plays sessions spin by spin |
 | `R/exact.R` | Exact engine: solves each session as a Markov chain |
 | `R/formulas.R` | Closed-form results from the literature, used to check the engines |
-| `R/plots.R` | Simulation charts shared by the report and the explorer |
+| `R/plots.R` | Simulation charts for the report |
 | `tests/testthat/` | Engine vs engine vs published formulas |
 | `report/` | Quarto source for the write-up |
-| `explorer/app.R` | Shiny app, exported with Shinylive to run in the browser |
+| `explorer/` | Interactive explorer: a JavaScript port of the engine and hand-drawn charts |
+| `explorer/tests/` | Checks the JavaScript engine against the R engine |
 | `build_site.R` | Runs the tests and builds the site |
 | `.github/workflows/deploy.yml` | Builds and publishes to GitHub Pages on push to `main` |
 

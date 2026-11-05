@@ -467,15 +467,36 @@ enough to catch the rare bad outcome.
 
 ## Try it yourself
 
-The explorer below runs the same R code in your browser (via
-[webR](https://docs.r-wasm.org/webr/latest/) and
-[Shinylive](https://posit-dev.github.io/r-shinylive/)). Pick a strategy, bankroll, target
-and table limit to see the exact odds alongside simulated sessions. The first load
-downloads R itself, which can take 30 seconds or more.
+Pick a strategy, bankroll, target and table limit below to see the exact odds, with
+simulated players as a check. It updates as you type, and you can hover over the charts
+for exact values. The explorer runs on a small JavaScript copy of the R engine, and every
+build checks the two against each other.
 
 ::: column-page
-<iframe class="explorer-frame" src="explorer/index.html" title="Betting strategy explorer" loading="lazy"></iframe>
+<iframe id="explorer-frame" class="explorer-frame" src="explorer/index.html" title="Betting strategy explorer"></iframe>
 :::
+
+```{=html}
+<script>
+  // Size the embed to its content, so it never needs its own scrollbar. The explorer
+  // reports height changes, but its first report can arrive before this script runs,
+  // so also measure once it has loaded.
+  (function () {
+    var frame = document.getElementById("explorer-frame");
+    function measure() {
+      var doc = frame.contentDocument;
+      if (doc && doc.body && doc.body.offsetHeight) frame.style.height = doc.body.offsetHeight + "px";
+    }
+    window.addEventListener("message", function (event) {
+      if (event.origin === window.location.origin && event.data && event.data.explorerHeight) {
+        frame.style.height = event.data.explorerHeight + "px";
+      }
+    });
+    frame.addEventListener("load", measure);
+    measure();
+  })();
+</script>
+```
 
 [Open the explorer in its own tab](explorer/index.html)
 
@@ -503,6 +524,7 @@ published results:
 | Martingale round statistics with a table limit | Pflaumer (2019), Table 1 |
 | Losing-streak probabilities | Brute-force enumeration of all 1,024 ten-spin sequences |
 | Simulation vs exact solver, all six strategies | Agreement within four standard errors |
+| The explorer's JavaScript engine, in 36 settings | The R exact solver |
 
 The code for each chart is folded beneath it. The setup code and tables are in the
 [report source](https://github.com/RustyRockets/martingale-simulator/blob/main/report/index.qmd).
