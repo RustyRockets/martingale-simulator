@@ -35,7 +35,9 @@ ui <- page_sidebar(
     selectInput("table_max", "Table maximum",
                 c("No limit" = "Inf", "$100" = "100", "$500" = "500",
                   "$1,000" = "1000", "$5,000" = "5000"), selected = "Inf"),
-    sliderInput("n_players", "Simulated players", min = 100, max = 2000, value = 500, step = 100),
+    helpText("A limit only changes the result if the strategy would bet more than it."),
+    sliderInput("n_players", "Simulated players", min = 100, max = 2000, value = 500, step = 100,
+                ticks = FALSE),
     actionButton("run", "Run", class = "btn-primary"),
     helpText("Exact numbers come from solving the game as a Markov chain. ",
              "The charts come from simulated players.")
@@ -45,14 +47,14 @@ ui <- page_sidebar(
   uiOutput("validation"),
   layout_columns(
     fill = FALSE,
-    value_box("Chance of target", textOutput("p_goal"), theme = "primary"),
+    value_box("Chance of reaching target", textOutput("p_goal"), theme = "primary"),
     value_box("Average result", textOutput("exp_result")),
     value_box("Average total bet", textOutput("exp_wagered")),
     value_box("Average spins", textOutput("exp_spins"))
   ),
   layout_columns(
     card(card_header("Twenty sample sessions"), plotOutput("paths", height = 320)),
-    card(card_header("Results across all simulated players"), plotOutput("hist", height = 320),
+    card(card_header("How the simulated sessions ended"), plotOutput("outcomes", height = 320),
          card_footer(textOutput("sim_note")))
   )
 )
@@ -136,21 +138,29 @@ server <- function(input, output, session) {
     text(max_spin, s$goal, "Target", adj = c(1, -0.4), col = "#1f6f66", cex = 0.85)
   })
 
-  output$hist <- renderPlot({
+  # Sessions end in one of two ways, so a two-bar chart says more than a
+  # histogram of results, which would only show two spikes.
+  output$outcomes <- renderPlot({
     s <- settings(); req(is.null(s$problem))
-    res <- sims()$many$result
-    par(mar = c(4, 4.5, 1, 1), col.axis = muted, fg = muted, family = "sans")
-    breaks <- pretty(range(res), n = 30)
-    hist(res, breaks = breaks, col = accent, border = "white", main = NULL,
-         xlab = "Result of the session ($)", ylab = "Players", las = 1)
-    abline(v = 0, col = muted, lty = 2)
+    m <- sims()$many
+    shares <- c("Went broke" = mean(!m$reached_goal), "Reached target" = mean(m$reached_goal))
+    exact_shares <- c(1 - exact()$p_goal, exact()$p_goal)
+    par(mar = c(4, 7.5, 1, 1), col.axis = muted, fg = muted, family = "sans")
+    y <- barplot(100 * shares, horiz = TRUE, xlim = c(0, 115), col = accent, border = NA,
+                 las = 1, xlab = "Share of simulated sessions (%)")
+    segments(100 * exact_shares, y - 0.5, 100 * exact_shares, y + 0.5, col = ink, lwd = 2)
+    text(100 * shares, y, sprintf("%.1f%%", 100 * shares), pos = 4, col = ink, cex = 0.95)
+    mtext("Black ticks mark the exact probability", side = 3, line = -0.2, adj = 1, col = muted, cex = 0.8)
   })
 
   output$sim_note <- renderText({
     m <- sims()$many
-    note <- sprintf("%s simulated players: %.1f%% reached the target, average result %s (exact: %.1f%%, %s).",
-                    format(nrow(m), big.mark = ","), 100 * mean(m$reached_goal), dollars(mean(m$result)),
-                    100 * exact()$p_goal, dollars(exact()$exp_result))
+    # 95% margins of error, so sampling noise isn't mistaken for a disagreement
+    moe_p <- 1.96 * sqrt(mean(m$reached_goal) * (1 - mean(m$reached_goal)) / nrow(m))
+    moe_r <- 1.96 * sd(m$result) / sqrt(nrow(m))
+    note <- sprintf("%s simulated players: %.1f%% (\u00b1%.1f) reached the target, average result %s (\u00b1%s). Exact: %.1f%%, %s.",
+                    format(nrow(m), big.mark = ","), 100 * mean(m$reached_goal), 100 * moe_p,
+                    dollars(mean(m$result)), dollars(moe_r), 100 * exact()$p_goal, dollars(exact()$exp_result))
     if (sims()$capped) note <- paste(note, "Sessions this long are capped to keep the page responsive.")
     note
   })

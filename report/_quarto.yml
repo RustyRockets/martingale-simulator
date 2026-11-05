@@ -13,9 +13,9 @@ format:
     code-summary: "Show code"
     code-tools:
       source: https://github.com/RustyRockets/martingale-simulator/blob/main/report/index.qmd
-    fig-width: 8
-    fig-height: 4.5
-    fig-dpi: 150
+    fig-width: 6
+    fig-height: 4
+    fig-dpi: 200
     embed-resources: false
     smooth-scroll: true
 

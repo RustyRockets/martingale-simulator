@@ -95,7 +95,7 @@ fibonacci <- function() {
 }
 
 # Bold play: bet whatever gets you to the goal in one win, or everything you
-# have if that is less. Dubins and Savage (1965) proved this maximises the
+# have if that is less. Dubins and Savage (1965) proved this maximizes the
 # chance of reaching a goal in a game where the odds are against you.
 # Without a goal it simply bets everything.
 bold_play <- function() {

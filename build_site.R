@@ -20,7 +20,8 @@ dir.create(file.path(app_dir, "R"), recursive = TRUE)
 file.copy("explorer/app.R", app_dir)
 file.copy(list.files("R", full.names = TRUE), file.path(app_dir, "R"))
 unlink("docs/explorer", recursive = TRUE)
-shinylive::export(app_dir, "docs/explorer")
+shinylive::export(app_dir, "docs/explorer",
+                  template_params = list(title = "Betting strategy explorer"))
 
 # GitHub Pages: serve files as-is (no Jekyll processing)
 file.create("docs/.nojekyll")
@@ -28,6 +29,4 @@ file.create("docs/.nojekyll")
 # README images are copies of the report's charts
 figs <- "docs/index_files/figure-html"
 file.copy(file.path(figs, "compare-1.png"), "images/strategy_comparison.png", overwrite = TRUE)
-file.copy(file.path(figs, "identity-1.png"), "images/edge_identity.png", overwrite = TRUE)
-file.copy(file.path(figs, "win-rate-1.png"), "images/win_rate.png", overwrite = TRUE)
-file.copy(file.path(figs, "single-run-1.png"), "images/single_run.png", overwrite = TRUE)
+file.copy(file.path(figs, "tail-1.png"), "images/win_rate.png", overwrite = TRUE)

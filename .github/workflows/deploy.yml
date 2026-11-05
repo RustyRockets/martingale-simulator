@@ -33,7 +33,7 @@ jobs:
 
       - name: Install R packages
         run: |
-          Rscript -e 'install.packages(c("ggplot2", "dplyr", "patchwork", "ggrepel",
+          Rscript -e 'install.packages(c("ggplot2", "dplyr", "patchwork",
             "scales", "knitr", "rmarkdown", "testthat", "Matrix", "shiny", "bslib",
             "shinylive"))'
 

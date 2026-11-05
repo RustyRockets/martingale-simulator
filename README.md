@@ -1,9 +1,12 @@
 # Can a betting system beat the house?
 
-An analysis of the **Martingale** betting system (double your bet after every loss)
-and five other roulette strategies. It uses two independent engines written in R, a
-Monte Carlo simulator and an exact Markov-chain solver, which are tested against each
-other and against published results.
+The **Martingale** betting system (double your bet after every loss) has tempted gamblers
+since at least Casanova, and it does win most of the time. This project shows why it still
+loses, what works better if you must gamble, and why a high win rate can mislead.
+
+It compares six roulette strategies in R using two independent engines, a Monte Carlo
+simulator and an exact Markov-chain solver, tested against each other and against
+published results.
 
 **[Read the analysis](https://rustyrockets.github.io/martingale-simulator/)** ·
 **[Try the explorer](https://rustyrockets.github.io/martingale-simulator/explorer/)**
@@ -15,16 +18,18 @@ other and against published results.
 
 Scenario: American roulette, betting red, $5 base bet, $400 bankroll, trying to reach $800.
 
-- **Every strategy loses the same share of what it bets.** The average result is
-  −5.26% (the house edge) × the total amount bet, exactly, for all six strategies.
-  The Martingale makes you bet about 5.6× your bankroll.
+- **A betting system can't change the house edge.** The average result is −5.26% (the
+  edge) × the total amount bet. This is a known result, and the exact solver confirms it
+  for all six strategies. The Martingale bets $2,226 on average to chase a $400 profit.
 - **One bold bet beats the Martingale.** A single $400 bet on red doubles your money
-  47.4% of the time, against 35.4% for the Martingale, and loses less on average
-  (−$21 vs −$117). Dubins and Savage (1965) proved that bold play is optimal for
-  reaching a goal in an unfavourable game.
+  47.4% of the time, against 35.4% for the Martingale, and costs less on average ($21
+  vs $117). Dubins and Savage (1965) proved that bold play is optimal for reaching a
+  goal in an unfavorable game.
 - **A high win rate is misleading.** Aiming for a $25 profit, the Martingale succeeds
-  91% of the time and still averages a loss. The same payoff shape appears in doubling
-  strategies outside the casino.
+  91% of the time and still loses $12 on average, because the other 9% of sessions lose
+  the whole $400. The same payoff shape appears in doubling strategies outside the casino.
+
+![Martingale results with a $25 target: 91.4% of sessions win $25, 8.6% lose $400](images/win_rate.png)
 
 ## Usage
 
@@ -52,8 +57,8 @@ Build everything (tests, report, explorer) into `docs/`:
 Rscript build_site.R
 ```
 
-Requires R ≥ 4.3, [Quarto](https://quarto.org), and the packages ggplot2, dplyr,
-patchwork, ggrepel, scales, knitr, rmarkdown, testthat, Matrix, shiny, bslib and
+Built with R 4.4 and [Quarto](https://quarto.org), and the packages ggplot2, dplyr,
+patchwork, scales, knitr, rmarkdown, testthat, Matrix, shiny, bslib and
 shinylive. Run the tests alone with `Rscript -e 'testthat::test_dir("tests/testthat")'`.
 
 ## Structure
