@@ -3,11 +3,18 @@
 # file before exporting, so the app uses exactly the same strategy, simulation
 # and exact-solver code as the report.
 #
-# Plots use base R graphics rather than ggplot2 to keep the in-browser
-# download small and the first load fast.
+# Charts come from R/plots.R, the same code the report uses.
 
 library(shiny)
 library(bslib)
+library(ggplot2)
+
+# The browser's R runs ggplot2 3.5, but Shinylive works out what to bundle from the
+# newer ggplot2 installed locally, which dropped these dependencies. Missing any of
+# them leaves a blank page. This block is never run; naming them gets them bundled.
+if (FALSE) {
+  library(MASS); library(mgcv); library(munsell); library(tibble); library(withr)
+}
 
 for (f in list.files("R", pattern = "\\.R$", full.names = TRUE)) source(f)
 
@@ -18,8 +25,6 @@ strategy_choices <- setNames(names(strategies), sapply(strategies, `[[`, "name")
 # with (goal / base bet)^2 for the progressive strategies.
 MAX_BANKROLL_UNITS <- 200
 MAX_GOAL_UNITS <- 400
-
-ink <- "#1c1d1f"; muted <- "#5d6066"; accent <- "#2a78d6"; line_col <- "#e3e5e8"
 
 ui <- page_sidebar(
   title = "Betting strategy explorer",
@@ -53,8 +58,9 @@ ui <- page_sidebar(
     value_box("Average spins", textOutput("exp_spins"))
   ),
   layout_columns(
-    card(card_header("Twenty sample sessions"), plotOutput("paths", height = 320)),
-    card(card_header("How the simulated sessions ended"), plotOutput("outcomes", height = 320),
+    card(card_header("Where the money is"), plotOutput("paths", height = 320),
+         card_footer(textOutput("density_note"))),
+    card(card_header("Where every player stands"), plotOutput("outcomes", height = 320),
          card_footer(textOutput("sim_note")))
   )
 )
@@ -105,11 +111,17 @@ server <- function(input, output, session) {
     req(is.null(s$problem))
     n <- min(s$n, max(100, floor(MAX_SIM_SPINS / exact()$exp_spins)))
     set.seed(1)
-    paths <- lapply(1:20, function(i) {
+    runs <- lapply(seq_len(n), function(i) {
       simulate_player(s$strategy, s$bankroll, s$p, s$unit, s$goal, s$table_max, path = TRUE)
     })
-    many <- simulate_many(n, s$strategy, s$bankroll, s$p, s$unit, s$goal, s$table_max)
-    list(paths = paths, many = many, capped = n < s$n)
+    many <- data.frame(
+      spins = sapply(runs, `[[`, "spins"),
+      reached_goal = sapply(runs, `[[`, "reached_goal"),
+      result = sapply(runs, `[[`, "final") - s$bankroll
+    )
+    # Chart up to the point where nearly every session has ended
+    max_spin <- max(5, ceiling(quantile(many$spins, 0.95)))
+    list(runs = runs, many = many, max_spin = max_spin, capped = n < s$n)
   })
 
   dollars <- function(x) {
@@ -123,34 +135,23 @@ server <- function(input, output, session) {
 
   output$paths <- renderPlot({
     s <- settings(); req(is.null(s$problem))
-    paths <- sims()$paths
-    max_spin <- max(sapply(paths, function(r) length(r$cash)), 1)
-    par(mar = c(4, 4.5, 1, 1), col.axis = muted, fg = muted, family = "sans")
-    plot(NA, xlim = c(0, max_spin), ylim = c(0, max(s$goal, sapply(paths, `[[`, "peak"))),
-         xlab = "Spin", ylab = "Cash in hand ($)", las = 1, bty = "n")
-    abline(h = pretty(c(0, s$goal)), col = line_col, lwd = 0.8)
-    abline(h = s$bankroll, col = muted, lty = 2)
-    abline(h = s$goal, col = "#1f6f66", lty = 3)
-    for (r in paths) lines(c(0, seq_along(r$cash)), c(s$bankroll, r$cash),
-                           col = adjustcolor(accent, 0.55), lwd = 1.2)
-    # Label the reference lines directly, at the right edge above each line
-    text(max_spin, s$bankroll, "Start", adj = c(1, -0.4), col = muted, cex = 0.85)
-    text(max_spin, s$goal, "Target", adj = c(1, -0.4), col = "#1f6f66", cex = 0.85)
+    sim <- sims()
+    density <- session_density(sim$runs, sim$max_spin, s$goal * 1.05, nx = 60, ny = 40)
+    plot_session_density(density, s$bankroll, s$goal, typical_run(sim$runs),
+                         base_size = 13, text_size = 3.6)
   })
 
-  # Sessions end in one of two ways, so a two-bar chart says more than a
-  # histogram of results, which would only show two spikes.
+  output$density_note <- renderText({
+    sprintf("Darker means more players held that amount. The black line is a typical session. Showing the first %s spins.",
+            format(sims()$max_spin, big.mark = ","))
+  })
+
+  # Sessions end in one of two ways, and this shows when, not just how many
   output$outcomes <- renderPlot({
     s <- settings(); req(is.null(s$problem))
-    m <- sims()$many
-    shares <- c("Went broke" = mean(!m$reached_goal), "Reached target" = mean(m$reached_goal))
-    exact_shares <- c(1 - exact()$p_goal, exact()$p_goal)
-    par(mar = c(4, 7.5, 1, 1), col.axis = muted, fg = muted, family = "sans")
-    y <- barplot(100 * shares, horiz = TRUE, xlim = c(0, 115), col = accent, border = NA,
-                 las = 1, xlab = "Share of simulated sessions (%)")
-    segments(100 * exact_shares, y - 0.5, 100 * exact_shares, y + 0.5, col = ink, lwd = 2)
-    text(100 * shares, y, sprintf("%.1f%%", 100 * shares), pos = 4, col = ink, cex = 0.95)
-    mtext("Black ticks mark the exact probability", side = 3, line = -0.2, adj = 1, col = muted, cex = 0.8)
+    sim <- sims()
+    plot_status(status_over_time(sim$many$spins, sim$many$reached_goal, sim$max_spin),
+                base_size = 13, short_labels = TRUE)
   })
 
   output$sim_note <- renderText({

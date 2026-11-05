@@ -37,20 +37,10 @@ num <- function(x) format(round(x), big.mark = ",")
 col_mart <- "#2a78d6"   # Martingale
 col_bold <- "#eb6834"   # bold play
 col_other <- "#8a8f98"  # every other strategy (context, labeled directly)
-ink <- "#1c1d1f"
-muted <- "#5d6066"
+ink <- CHART_INK
+muted <- CHART_MUTED
 text_size <- 4.2        # geom_text size, in mm, to match the axis text
-theme_set(
-  theme_minimal(base_size = 14) +
-    theme(panel.grid.minor = element_blank(),
-          panel.grid.major = element_line(color = "#e3e5e8"),
-          plot.title = element_text(face = "bold", size = rel(1.1)),
-          plot.subtitle = element_text(color = muted, size = rel(0.85)),
-          axis.text = element_text(size = rel(0.9)),
-          plot.title.position = "plot",
-          plot.margin = margin(6, 16, 6, 6),  # room for the last axis label
-          legend.position = "none")
-)
+theme_set(theme_report())
 strategy_colors <- c("Martingale" = col_mart, "Bold play" = col_bold,
                      "Flat bets" = col_other, "Reverse Martingale" = col_other,
                      "D'Alembert" = col_other, "Fibonacci" = col_other)
@@ -99,14 +89,22 @@ m100 <- solve_exact(martingale(), bankroll, p, unit, 2 * bankroll, table_max = 1
 
 # 7. Losing-streak odds quoted in the text
 streak_at <- function(n) prob_losing_streak(7, n, 1 - p)
-# 8. Chart alt text and captions that quote computed numbers
-alt_run <- sprintf("Line chart of cash over spins for 31 simulated Martingale players starting at $400. The highlighted typical player climbs slowly to about %s, then loses everything in a few spins.", usd(median_peak))
+# 8. The Martingale players from step 2, followed over time
+mart_sims <- sims$martingale
+first_win <- min(mart_sims$spins[mart_sims$reached_goal])
+broke_by_first_win <- mean(mart_sims$spins <= first_win & !mart_sims$reached_goal)
+status_end <- ceiling(quantile(mart_sims$spins, 0.99))
+
+# 9. Chart alt text and captions that quote computed numbers
+alt_run <- sprintf("Heat map of cash over spins for 2,000 simulated Martingale players starting at $400. A dark ridge climbs steadily, with fainter bands below it. A typical player climbs to about %s, then falls to zero.", usd(median_peak))
 alt_bet <- sprintf("Bar chart of the average total amount bet per session. Bold play bets $400 and loses %s. The Martingale bets %s and loses %s. Flat bets bet the most, %s, and lose almost the whole $400.", cost(b$exp_result), usd(m$exp_wagered), cost(m$exp_result), usd(f$exp_wagered))
 alt_streak <- sprintf("Line chart rising with spins played. The chance of at least one streak of seven losses reaches %s by spin 120 and %s by spin 500.", pct(streak_at(120), 0), pct(streak_at(500), 0))
 alt_compare <- sprintf("Bar chart of the chance of doubling $400. Bold play %s, Martingale %s, Reverse Martingale %s, Fibonacci %s, D'Alembert %s, flat bets %s. Simulated results sit close to each exact value.",
                        pct(b$p_goal), pct(m$p_goal), pct(r$p_goal), pct(exact$p_goal[exact$strategy == "Fibonacci"]),
                        pct(exact$p_goal[exact$strategy == "D'Alembert"]), pct(f$p_goal, 2))
 alt_tail <- sprintf("Two blocks on a shared zero line. A wide, shallow block shows %s of sessions winning $25. A narrow, deep block shows %s of sessions losing $400.", pct(m25$p_goal), pct(1 - m25$p_goal))
+alt_status <- sprintf("Stacked area chart of all players over time. Nearly everyone starts out playing. The went-broke area grows steadily from the first spins, and the reached-target area only appears around spin %s, ending near %s.", num(first_win), pct(m$p_goal, 0))
+cap_status <- sprintf("Every simulated player's state after each spin. The chart ends at spin %s, by which time 99%% of sessions were over.", num(status_end))
 cap_tail <- sprintf("Each block's area is its contribution to the average result: +%s from wins and −%s from losses, which nets to %s per session.",
                     usd(m25$p_goal * 25), usd((1 - m25$p_goal) * bankroll), usd(m25$exp_result))
 ```
@@ -141,36 +139,18 @@ and you start again. Since red has to come up eventually, it *feels* like a mach
 for printing small, steady wins.
 
 ```{r single-run}
-#| fig-cap: "Martingale players who never walk away. The highlighted player is the one of 200 whose peak and session length were closest to the median of the 10,000 simulated players. Gray lines show 30 others. The view stops at 400 spins and $1,500, so the longest and luckiest runs are cut off."
+#| fig-cap: "Where the money is. Shading shows how many of 2,000 Martingale players who never walk away held each amount at each spin, darker meaning more. Players drop out of the picture as they go broke. The black line is the player closest to the median on peak and session length. The view stops at 400 spins and $1,500."
 #| fig-alt: !expr alt_run
 set.seed(11)
-runs <- lapply(1:200, function(i) simulate_player(martingale(), bankroll, p, unit, path = TRUE))
+runs <- lapply(1:2000, function(i) simulate_player(martingale(), bankroll, p, unit, path = TRUE))
 
-# Pick the run closest to the typical player, rather than a dramatic one
-distance <- sapply(runs, function(x) abs(log(x$peak / median_peak)) + abs(log(x$spins / median_spins)))
-typical <- runs[[which.min(distance)]]
-
-path_df <- function(x, id) data.frame(id = id, spin = c(0, seq_along(x$cash)), cash = c(bankroll, x$cash))
-others <- do.call(rbind, Map(path_df, runs[1:30], 1:30))
-typical_df <- path_df(typical, 0)
-top <- typical_df[which.max(typical_df$cash), ]
-
-ggplot(mapping = aes(spin, cash)) +
-  geom_line(data = others, aes(group = id), color = col_other, alpha = 0.35, linewidth = 0.4) +
-  geom_hline(yintercept = bankroll, color = muted, linetype = "dashed", linewidth = 0.4) +
-  geom_line(data = typical_df, color = col_mart, linewidth = 1) +
-  annotate("label", x = top$spin, y = top$cash + 170, label = "A typical player", size = text_size,
-           color = ink, fill = "white", linewidth = 0) +
-  annotate("label", x = 400, y = bankroll - 90, label = "Starting bankroll", hjust = 1,
-           size = text_size - 0.4, color = muted, fill = "white", linewidth = 0) +
-  scale_y_continuous(labels = scales::dollar) +
-  coord_cartesian(xlim = c(0, 400), ylim = c(0, 1500), expand = FALSE) +
-  labs(x = "Spin", y = "Cash in hand",
-       title = "Slow gains, then one streak takes everything",
+plot_session_density(session_density(runs, max_spin = 400, max_cash = 1500), bankroll,
+                     typical = typical_run(runs), text_size = text_size) +
+  labs(title = "Most players climb, then fall off a cliff",
        subtitle = "$5 base bet, $400 bankroll, American roulette")
 ```
 
-Most sessions look something like this. Among `r num(n_sim)` simulated players who use
+The dark ridge is the promise: a steady climb of $5 at a time. The fainter bands below it are players recovering from a big hit. Among `r num(n_sim)` simulated players who use
 the Martingale and never walk away, **`r pct(share_ahead)` were ahead of their starting
 $400 at some point**. The median player's best moment was `r usd(median_peak)`, and the
 median session lasted `r num(median_spins)` spins. In the end every one of them lost
@@ -368,6 +348,18 @@ In practice, bold play needs a table that accepts the bet. At a $100 table maxim
 chance of doubling falls to `r pct(b100$p_goal)`, though that is still well above the
 Martingale's `r pct(m100$p_goal)` at the same table.
 
+Following the Martingale players over time shows how those odds play out. The first
+of the `r num(n_sim)` simulated players reached $800 on spin `r num(first_win)`, and by
+then `r pct(broke_by_first_win, 0)` had already gone broke:
+
+```{r status}
+#| fig-cap: !expr cap_status
+#| fig-alt: !expr alt_status
+plot_status(status_over_time(mart_sims$spins, mart_sims$reached_goal, status_end)) +
+  labs(title = "Nearly half go broke before anyone wins",
+       subtitle = "10,000 Martingale players trying to turn $400 into $800")
+```
+
 None of this makes roulette a good investment. Every strategy in the table has a negative
 average. Bold play is simply the least bad way to chase a fixed target.
 
@@ -479,7 +471,7 @@ The explorer below runs the same R code in your browser (via
 [webR](https://docs.r-wasm.org/webr/latest/) and
 [Shinylive](https://posit-dev.github.io/r-shinylive/)). Pick a strategy, bankroll, target
 and table limit to see the exact odds alongside simulated sessions. The first load
-downloads R itself, which can take 20 seconds or more.
+downloads R itself, which can take 30 seconds or more.
 
 ::: column-page
 <iframe class="explorer-frame" src="explorer/index.html" title="Betting strategy explorer" loading="lazy"></iframe>

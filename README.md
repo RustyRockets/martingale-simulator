@@ -58,7 +58,7 @@ Rscript build_site.R
 ```
 
 Built with R 4.4 and [Quarto](https://quarto.org), and the packages ggplot2, dplyr,
-patchwork, scales, knitr, rmarkdown, testthat, Matrix, shiny, bslib and
+patchwork, munsell, tibble, withr, MASS, mgcv, scales, knitr, rmarkdown, testthat, Matrix, shiny, bslib and
 shinylive. Run the tests alone with `Rscript -e 'testthat::test_dir("tests/testthat")'`.
 
 ## Structure
@@ -69,6 +69,7 @@ shinylive. Run the tests alone with `Rscript -e 'testthat::test_dir("tests/testt
 | `R/simulate.R` | Monte Carlo engine: plays sessions spin by spin |
 | `R/exact.R` | Exact engine: solves each session as a Markov chain |
 | `R/formulas.R` | Closed-form results from the literature, used to check the engines |
+| `R/plots.R` | Simulation charts shared by the report and the explorer |
 | `tests/testthat/` | Engine vs engine vs published formulas |
 | `report/` | Quarto source for the write-up |
 | `explorer/app.R` | Shiny app, exported with Shinylive to run in the browser |
